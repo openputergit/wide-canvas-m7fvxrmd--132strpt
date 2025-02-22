@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrutalBudget - Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .brutal-box {
+            border: 3px solid black;
+            box-shadow: 4px 4px 0 black;
+            transition: all 0.2s ease;
+        }
+        .brutal-box:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0 black;
+        }
+        .brutal-button {
+            border: 2px solid black;
+            box-shadow: 3px 3px 0 black;
+            transition: all 0.2s ease;
+        }
+        .brutal-button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 black;
+        }
+        body {
+            background-color: #a7d2e5;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="brutal-box bg-yellow-300 p-6 mb-8">
+            <h1 class="text-4xl font-bold">BrutalBudget</h1>
+            <p class="text-xl">Your No-Nonsense Expense Tracker</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Expense Input Section -->
+            <div class="brutal-box bg-white p-6">
+                <h2 class="text-2xl font-bold mb-4">Add New Expense</h2>
+                <form id="expenseForm" class="space-y-4">
+                    <div>
+                        <input type="text" id="expenseName" placeholder="Expense Description" class="w-full p-2 brutal-box" required>
+                    </div>
+                    <div>
+                        <input type="number" id="expenseAmount" placeholder="Amount" class="w-full p-2 brutal-box" required>
+                    </div>
+                    <div>
+                        <select id="expenseCategory" class="w-full p-2 brutal-box" required>
+                            <option value="">Select Category</option>
+                            <option value="food">Food</option>
+                            <option value="transport">Transport</option>
+                            <option value="utilities">Utilities</option>
+                            <option value="entertainment">Entertainment</option>
+                            <option value="others">Others</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full p-2 bg-green-400 brutal-button font-bold">Add Expense</button>
+                </form>
+            </div>
+
+            <!-- Statistics Section -->
+            <div class="brutal-box bg-white p-6">
+                <h2 class="text-2xl font-bold mb-4">Statistics</h2>
+                <canvas id="expenseChart" class="mb-4"></canvas>
+                <div class="text-xl">
+                    Total This Month: <span id="monthTotal" class="font-bold">$0</span>
+                </div>
+            </div>
+
+            <!-- AI Chat Section -->
+            <div class="brutal-box bg-white p-6 md:col-span-2">
+                <h2 class="text-2xl font-bold mb-4">AI Budget Assistant</h2>
+                <div id="chatbox" class="h-48 overflow-y-auto p-4 brutal-box bg-gray-100 mb-4"></div>
+                <form id="chatForm" class="flex gap-2">
+                    <input type="text" id="userMessage" placeholder="Ask for budget advice..." class="flex-1 p-2 brutal-box">
+                    <button type="submit" class="p-2 bg-blue-400 brutal-button"><i class="bi bi-send"></i></button>
+                </form>
+            </div>
+
+            <!-- Expense List -->
+            <div class="brutal-box bg-white p-6 md:col-span-2">
+                <h2 class="text-2xl font-bold mb-4">Recent Expenses</h2>
+                <div id="expenseList" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let expenses = [];
+        const chart = new Chart(document.getElementById('expenseChart'), {
+            type: 'pie',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: [
+                        '#FF6384',
+                        '#36A2EB',
+                        '#FFCE56',
+                        '#4BC0C0',
+                        '#9966FF'
+                    ]
+                }]
+            }
+        });
+
+        function updateChart() {
+            const categories = {};
+            expenses.forEach(expense => {
+                categories[expense.category] = (categories[expense.category] || 0) + expense.amount;
+            });
+
+            chart.data.labels = Object.keys(categories);
+            chart.data.datasets[0].data = Object.values(categories);
+            chart.update();
+        }
+
+        function updateMonthTotal() {
+            const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+            document.getElementById('monthTotal').textContent = `$${total.toFixed(2)}`;
+        }
+
+        function addExpenseToList(expense) {
+            const expenseList = document.getElementById('expenseList');
+            const expenseItem = document.createElement('div');
+            expenseItem.className = 'brutal-box p-3 bg-gray-100 flex justify-between items-center';
+            expenseItem.innerHTML = `
+                <div>
+                    <span class="font-bold">${expense.name}</span>
+                    <span class="text-gray-600">(${expense.category})</span>
+                </div>
+                <span class="font-bold">$${expense.amount.toFixed(2)}</span>
+            `;
+            expenseList.prepend(expenseItem);
+        }
+
+        // AI Chat responses
+        const aiResponses = {
+            food: "Try meal prepping to reduce food expenses. It can save up to 40% on your food budget!",
+            transport: "Consider using public transportation or carpooling to reduce transport costs.",
+            utilities: "You can save on utilities by using energy-efficient appliances and being mindful of usage.",
+            entertainment: "Look for free local events and activities to reduce entertainment expenses.",
+            others: "Review your miscellaneous expenses regularly to identify potential savings."
+        };
+
+        function addChatMessage(message, isUser = false) {
+            const chatbox = document.getElementById('chatbox');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `p-2 mb-2 brutal-box ${isUser ? 'bg-blue-200 ml-auto' : 'bg-green-200'} max-w-[80%]`;
+            messageDiv.textContent = message;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        // Event Listeners
+        document.getElementById('expenseForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('expenseName').value;
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const category = document.getElementById('expenseCategory').value;
+
+            const expense = { name, amount, category };
+            expenses.push(expense);
+            addExpenseToList(expense);
+            updateChart();
+            updateMonthTotal();
+
+            e.target.reset();
+        });
+
+        document.getElementById('chatForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userMessage = document.getElementById('userMessage').value;
+            addChatMessage(userMessage, true);
+
+            // Simple AI response based on latest expense category
+            const latestExpense = expenses[expenses.length - 1];
+            if (latestExpense) {
+                setTimeout(() => {
+                    addChatMessage(aiResponses[latestExpense.category] || "I can help you analyze your spending patterns and suggest ways to save money.");
+                }, 500);
+            } else {
+                setTimeout(() => {
+                    addChatMessage("Start adding your expenses, and I'll help you analyze them and suggest savings opportunities!");
+                }, 500);
+            }
+
+            e.target.reset();
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
